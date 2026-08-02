@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deliverability Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0" crossorigin="anonymous"></script>
+<style>
+:root {
+  --bg-primary: #f7f8fa;
+  --bg-card: #ffffff;
+  --bg-header: #1b2035;
+  --text-primary: #1f2430;
+  --text-secondary: #6b7280;
+  --text-on-dark: #ffffff;
+  --positive: #2e9e5b;
+  --negative: #d9534f;
+  --watch: #e8a33d;
+  --accent: #3f7ae0;
+  --border-color: #e5e7eb;
+  --hover-bg: #f8f9fa;
+  --note-bg: #fff8e6;
+  --note-border: #f0dfa8;
+  --note-text: #7a5c00;
+  --gap: 16px;
+  --radius: 10px;
+}
+[data-theme="dark"] {
+  --bg-primary: #0f1420;
+  --bg-card: #1a2233;
+  --bg-header: #0b0e1a;
+  --text-primary: #e8eaf0;
+  --text-secondary: #9aa4b2;
+  --border-color: #2a3345;
+  --hover-bg: #212b3d;
+  --note-bg: #2a2410;
+  --note-border: #4a4020;
+  --note-text: #e8c468;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.dashboard-container { max-width: 1440px; margin: 0 auto; padding: var(--gap); }
+.dashboard-header {
+  background: var(--bg-header);
+  color: var(--text-on-dark);
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  margin-bottom: var(--gap);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.dashboard-header h1 { font-size: 20px; font-weight: 600; }
+.dashboard-header p { font-size: 12px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+.filters { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.filter-group { display: flex; align-items: center; gap: 6px; }
+.filter-group label { font-size: 12px; color: rgba(255,255,255,0.7); }
+.filter-group select {
+  padding: 6px 10px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.1);
+  color: var(--text-on-dark);
+  font-size: 13px;
+}
+.filter-group select option { background: var(--bg-header); color: var(--text-on-dark); }
+.filter-group input[type="number"] {
+  width: 64px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.1);
+  color: var(--text-on-dark);
+  font-size: 13px;
+}
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+  padding: 7px 14px;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.1);
+  color: var(--text-on-dark);
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.22); }
+.icon-btn:active { transform: scale(0.96); }
+.icon-btn.spinning svg { animation: spin 0.6s linear; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.note {
+  background: var(--note-bg); border: 1px solid var(--note-border); border-radius: var(--radius);
+  padding: 12px 16px; font-size: 13px; color: var(--note-text); margin-bottom: var(--gap);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+}
+.kpi-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: background 0.2s ease;
+}
+.kpi-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; }
+.kpi-value { font-size: 24px; font-weight: 700; }
+.kpi-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.kpi-value.warn { color: var(--negative); }
+.kpi-value.good { color: var(--positive); }
+.section-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin: 22px 0 10px; }
+.chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
+.chart-container { background: var(--bg-card); border-radius: var(--radius); padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: background 0.2s ease; }
+.chart-container h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+.chart-container canvas { max-height: 280px; }
+.table-section { background: var(--bg-card); border-radius: var(--radius); padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto; margin-bottom: var(--gap); transition: background 0.2s ease; }
+.table-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table thead th {
+  text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border-color);
+  color: var(--text-secondary); font-weight: 600; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; cursor: pointer; user-select: none;
+}
+.data-table thead th:hover { color: var(--text-primary); background: var(--hover-bg); }
+.data-table tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border-color); }
+.data-table tbody tr:hover { background: var(--hover-bg); }
+.status-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.status-healthy { background: #e6f6ec; color: var(--positive); }
+.status-watch { background: #fdf1de; color: #b8791f; }
+.status-risk { background: #fbe9e8; color: var(--negative); }
+.dashboard-footer { text-align: center; font-size: 12px; color: var(--text-secondary); padding: 16px 0 4px; }
+@media (max-width: 768px) {
+  .dashboard-header { flex-direction: column; align-items: flex-start; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .chart-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <div>
+      <h1>Deliverability Dashboard</h1>
+      <p id="header-sub">&middot;</p>
+    </div>
+    <div class="filters">
+      <div class="filter-group">
+        <label for="filter-account">Account</label>
+        <select id="filter-account" onchange="dashboard.applyFilters()">
+          <option value="all">All accounts</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-sender">Sender / Channel</label>
+        <select id="filter-sender" onchange="dashboard.applyFilters()">
+          <option value="all">All senders</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-window">Window</label>
+        <select id="filter-window" onchange="dashboard.applyFilters()">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="expected-accounts">Expected Accounts</label>
+        <input type="number" id="expected-accounts" min="1" value="38" onchange="dashboard.applyFilters()">
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="refresh-btn" onclick="dashboard.refresh()" title="Reset filters and re-render">
+        <span id="refresh-icon">&#8635;</span> Refresh
+      </button>
+      <button class="icon-btn" id="theme-toggle" onclick="dashboard.toggleTheme()" title="Toggle dark / light mode">
+        &#9789; Dark
+      </button>
+    </div>
+  </header>
+
+  <div class="section-title">Key Metrics</div>
+  <section class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Emails Checked</div>
+      <div class="kpi-value" id="kpi-total">0</div>
+      <div class="kpi-sub" id="kpi-total-sub"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Spam Rate</div>
+      <div class="kpi-value" id="kpi-spamrate">0%</div>
+      <div class="kpi-sub">share landing in Spam</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Deliverability Rate</div>
+      <div class="kpi-value" id="kpi-deliverability">0%</div>
+      <div class="kpi-sub">landed anywhere but Spam</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Primary Placement Rate</div>
+      <div class="kpi-value" id="kpi-primaryrate">0%</div>
+      <div class="kpi-sub">share landing in Primary tab</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Unique Accounts Seen</div>
+      <div class="kpi-value" id="kpi-accounts">0</div>
+      <div class="kpi-sub" id="kpi-accounts-sub"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Silent Accounts</div>
+      <div class="kpi-value" id="kpi-silent">0</div>
+      <div class="kpi-sub">expected minus active, in window</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Days Tracked</div>
+      <div class="kpi-value" id="kpi-days">0</div>
+      <div class="kpi-sub">distinct calendar days in window</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Emails / Account</div>
+      <div class="kpi-value" id="kpi-avg">0</div>
+      <div class="kpi-sub">total / accounts seen</div>
+    </div>
+  </section>
+
+  <div class="section-title">Inbox &middot; Channel Breakdown</div>
+  <section class="chart-row">
+    <div class="chart-container">
+      <h3>Emails by Sending Lane</h3>
+      <canvas id="chart-channel"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Category Distribution</h3>
+      <canvas id="chart-category"></canvas>
+    </div>
+  </section>
+
+  <div class="section-title">Trends</div>
+  <section class="chart-row">
+    <div class="chart-container">
+      <h3>Daily Volume: Inbox vs Spam</h3>
+      <canvas id="chart-volume"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Spam Rate Trend</h3>
+      <canvas id="chart-spamtrend"></canvas>
+    </div>
+  </section>
+
+  <section class="chart-row">
+    <div class="chart-container" style="grid-column: 1 / -1;">
+      <h3>Spam Rate by Account (highest first)</h3>
+      <canvas id="chart-worstaccounts"></canvas>
+    </div>
+  </section>
+
+  <div class="section-title">Account Health</div>
+  <section class="table-section">
+    <div id="account-table"></div>
+  </section>
+
+  <div class="section-title">Channel Detail</div>
+  <section class="table-section">
+    <div id="channel-table"></div>
+  </section>
+
+  <footer class="dashboard-footer">Data as of <span id="data-date"></span> &middot; sourced from Inbox_Placement_Tracker.xlsx</footer>
+</div>
+
+<script>
+const SOURCE = {"accounts": ["AidePatellis3Ax@gmail.com", "ByronMarottiu6B@gmail.com", "DarnellWollschlager0@gmail.com", "DeweyPantoneC@gmail.com", "ErichGlaweqB@gmail.com", "EvanMoselleu@gmail.com", "HoseaCollardHFB@gmail.com", "JaneeSarzynski4@gmail.com", "JohnathonMunstermanu@gmail.com", "KrystaFlashertI@gmail.com", "LakenyaSwepsonw@gmail.com", "MalcomBisiRgL@gmail.com", "MayeCimianowN@gmail.com", "MikelHalabyq@gmail.com", "MoisesTrbovichNy9@gmail.com", "Nurishafnan@gmail.con", "OrvalMollenkopfUl@gmail.com", "RafaelPallone8@gmail.com", "TajuanaRiherdF1@gmail.com", "TimHarpoolC30@gmail.com", "alpharithmpat@gmail.com", "dorotheakirknessv7@gmail.com", "drthjkjasx9@gmail.com", "emilerostadw@gmail.com", "faustinoreddic9@gmail.com", "fplclique@gmail.com", "franklinhandyhb@gmail.com", "gerrybarrasa14f@gmail.com", "hellenpaull432@gmail.com", "judiederossoxkw@gmail.com", "lelettq@gmail.com", "patnathan2026@gmail.com", "petefinsethicf@gmail.com", "shadlaverdiere3v@gmail.com", "sheliastaplefordeo@gmail.com", "tiffanyybell098@gmail.com"], "senders": ["clara.muller@aiwork.app", "emma.laurent@aiwork.app", "ethan.brooks@aiwork.app", "mia.chen@aiwork.app", "noah.williams@aiwork.app", "notifications@aiwork.app", "orion@aiwork.app", "sofia.martinez@aiwork.app", "support@aiwork.app"], "log": [{"account_email": "HoseaCollardHFB@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "HoseaCollardHFB@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "HoseaCollardHFB@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "HoseaCollardHFB@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "HoseaCollardHFB@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "HoseaCollardHFB@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "HoseaCollardHFB@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "HoseaCollardHFB@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "HoseaCollardHFB@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "shadlaverdiere3v@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "fplclique@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DeweyPantoneC@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ErichGlaweqB@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "notifications@aiwork.app", "subject": "Your Aiwork Verification Code", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Email to Activate Your Aiwork Account", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-05555", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JaneeSarzynski4@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "judiederossoxkw@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "notifications@aiwork.app", "subject": "Your Aiwork Verification Code", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Email to Activate Your Aiwork Account", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-05555", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "lelettq@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-38103", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MalcomBisiRgL@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MoisesTrbovichNy9@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "notifications@aiwork.app", "subject": "Your Aiwork Verification Code", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "notifications@aiwork.app", "subject": "Confirm Your Email to Activate Your Aiwork Account", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-05555", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "Nurishafnan@gmail.con", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-38103", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "patnathan2026@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "RafaelPallone8@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "sheliastaplefordeo@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "notifications@aiwork.app", "subject": "Your Aiwork Verification Code", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Email to Activate Your Aiwork Account", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-05555", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "tiffanyybell098@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-38103", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TimHarpoolC30@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "AidePatellis3Ax@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "faustinoreddic9@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "notifications@aiwork.app", "subject": "Your Aiwork Verification Code", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Email to Activate Your Aiwork Account", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-05555", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "LakenyaSwepsonw@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-38103", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "petefinsethicf@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "gerrybarrasa14f@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "dorotheakirknessv7@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "notifications@aiwork.app", "subject": "Your Aiwork Verification Code", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Email to Activate Your Aiwork Account", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-05555", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "OrvalMollenkopfUl@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-38103", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MayeCimianowN@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-41589", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "TajuanaRiherdF1@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "JohnathonMunstermanu@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "notifications@aiwork.app", "subject": "Your Aiwork Verification Code", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Email to Activate Your Aiwork Account", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-05555", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "DarnellWollschlager0@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-38103", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "EvanMoselleu@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-41589", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "KrystaFlashertI@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-88083", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-76309", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "MikelHalabyq@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-33074", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "ByronMarottiu6B@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-01197", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "alpharithmpat@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "notifications@aiwork.app", "subject": "Your Aiwork Verification Code", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Email to Activate Your Aiwork Account", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-05555", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "emilerostadw@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-38103", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "drthjkjasx9@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-41589", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "franklinhandyhb@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "notifications@aiwork.app", "subject": "Confirm Your Aiwork Email", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "orion@aiwork.app", "subject": "Your Orion AI Report is Ready", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "support@aiwork.app", "subject": "Your Support Request \u2013 AWK-88083", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "ethan.brooks@aiwork.app", "subject": "A note from Ethan Brooks", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "emma.laurent@aiwork.app", "subject": "A note from Emma Laurent", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "noah.williams@aiwork.app", "subject": "A note from Noah Williams", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "mia.chen@aiwork.app", "subject": "A note from Mia Chen", "category": "Updates", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "sofia.martinez@aiwork.app", "subject": "A note from Sofia Martinez", "category": "Promotions", "folder": "Inbox", "date": "2026-08-02"}, {"account_email": "hellenpaull432@gmail.com", "from": "clara.muller@aiwork.app", "subject": "A note from Clara Muller", "category": "Primary", "folder": "Inbox", "date": "2026-08-02"}], "today": "2026-08-02"};
+const CAT_COLORS = { Primary: "#3f7ae0", Updates: "#4fa87c", Promotions: "#e8a33d", Social: "#9b6bd6", Forums: "#6b7280", Spam: "#d9534f" };
+const PALETTE = ["#3f7ae0", "#e8a33d", "#4fa87c", "#9b6bd6", "#6b7280", "#d9534f", "#2e9e5b", "#c084fc", "#f59e0b"];
+
+Chart.register(ChartDataLabels);
+Chart.defaults.set('plugins.datalabels', { display: false });
+
+function fmtPct(v) { return (v * 100).toFixed(1) + "%"; }
+function fmtNum(v) { return v.toLocaleString(); }
+
+class Dashboard {
+  constructor(source) {
+    this.accounts = source.accounts;
+    this.senders = source.senders;
+    this.allLog = source.log;
+    this.today = source.today;
+    this.charts = {};
+    this.sortField = "spamRate";
+    this.sortDir = "desc";
+    this.init();
+  }
+
+  init() {
+    document.getElementById("data-date").textContent = this.today;
+
+    const acctSelect = document.getElementById("filter-account");
+    this.accounts.forEach(a => {
+      const opt = document.createElement("option");
+      opt.value = a; opt.textContent = a;
+      acctSelect.appendChild(opt);
+    });
+    const sendSelect = document.getElementById("filter-sender");
+    this.senders.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      sendSelect.appendChild(opt);
+    });
+
+    this.applyFilters();
+  }
+
+  getWindowDates(windowDays) {
+    const end = new Date(this.today);
+    const dates = [];
+    for (let i = windowDays - 1; i >= 0; i--) {
+      const d = new Date(end);
+      d.setDate(d.getDate() - i);
+      dates.push(d.toISOString().slice(0, 10));
+    }
+    return dates;
+  }
+
+  applyFilters() {
+    const acctFilter = document.getElementById("filter-account").value;
+    const sendFilter = document.getElementById("filter-sender").value;
+    const windowDays = parseInt(document.getElementById("filter-window").value, 10);
+    const dateSet = new Set(this.getWindowDates(windowDays));
+
+    this.expectedAccounts = parseInt(document.getElementById("expected-accounts").value, 10) || this.accounts.length;
+    this.acctFilter = acctFilter;
+
+    document.getElementById("header-sub").textContent =
+      `${this.expectedAccounts} expected inboxes \u00b7 ${this.accounts.length} seen so far \u00b7 ${this.senders.length} sending lanes`;
+
+    this.filtered = this.allLog.filter(r => {
+      if (acctFilter !== "all" && r.account_email !== acctFilter) return false;
+      if (sendFilter !== "all" && r.from !== sendFilter) return false;
+      if (!dateSet.has(r.date)) return false;
+      return true;
+    });
+    this.activeAccounts = acctFilter === "all" ? this.accounts : [acctFilter];
+    this.activeSenders = sendFilter === "all" ? this.senders : [sendFilter];
+    this.windowDates = [...dateSet].sort();
+
+    this.renderKPIs();
+    this.renderCharts();
+    this.renderAccountTable();
+    this.renderChannelTable();
+  }
+
+  refresh() {
+    const icon = document.getElementById("refresh-btn");
+    icon.classList.add("spinning");
+    document.getElementById("filter-account").value = "all";
+    document.getElementById("filter-sender").value = "all";
+    document.getElementById("filter-window").value = "30";
+    this.applyFilters();
+    setTimeout(() => icon.classList.remove("spinning"), 500);
+  }
+
+  toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute("data-theme") === "dark";
+    const next = isDark ? "light" : "dark";
+    html.setAttribute("data-theme", next);
+    Chart.defaults.color = next === "dark" ? "#9aa4b2" : "#1f2430";
+    Chart.defaults.borderColor = next === "dark" ? "#2a3345" : "#e5e7eb";
+    document.getElementById("theme-toggle").innerHTML =
+      next === "dark" ? "&#9728; Light" : "&#9789; Dark";
+    this.renderCharts();
+  }
+
+  renderKPIs() {
+    const total = this.filtered.length;
+    const spam = this.filtered.filter(r => r.folder === "Spam").length;
+    const primary = this.filtered.filter(r => r.category === "Primary").length;
+
+    document.getElementById("kpi-total").textContent = fmtNum(total);
+    document.getElementById("kpi-total-sub").textContent = this.windowDates.length + " day window";
+
+    const spamRate = total ? spam / total : 0;
+    const spamEl = document.getElementById("kpi-spamrate");
+    spamEl.textContent = fmtPct(spamRate);
+    spamEl.className = "kpi-value warn";
+
+    const delivEl = document.getElementById("kpi-deliverability");
+    delivEl.textContent = total ? fmtPct((total - spam) / total) : "0%";
+    delivEl.className = "kpi-value good";
+
+    document.getElementById("kpi-primaryrate").textContent = total ? fmtPct(primary / total) : "0%";
+
+    const seenAccounts = new Set(this.filtered.map(r => r.account_email));
+    document.getElementById("kpi-accounts").textContent = seenAccounts.size;
+    document.getElementById("kpi-accounts-sub").textContent = `of ${this.expectedAccounts} expected`;
+
+    const silent = this.acctFilter === "all" ? Math.max(0, this.expectedAccounts - seenAccounts.size) : 0;
+    const silentEl = document.getElementById("kpi-silent");
+    silentEl.textContent = silent;
+    silentEl.className = "kpi-value" + (silent > 0 ? " warn" : "");
+
+    const daysSeen = new Set(this.filtered.map(r => r.date));
+    document.getElementById("kpi-days").textContent = daysSeen.size;
+
+    document.getElementById("kpi-avg").textContent = seenAccounts.size ? (total / seenAccounts.size).toFixed(1) : "0";
+  }
+
+  renderCharts() {
+    // Channel breakdown: stacked bar of category counts per sender
+    const cats = ["Primary", "Updates", "Promotions", "Social", "Forums", "Spam"];
+    const senderDatasets = cats.map(cat => ({
+      label: cat,
+      data: this.activeSenders.map(s => this.filtered.filter(r => r.from === s && r.category === cat).length),
+      color: CAT_COLORS[cat]
+    })).filter(ds => ds.data.some(v => v > 0));
+    this.upsertStackedBar("chart-channel", this.activeSenders, senderDatasets);
+
+    // Category distribution doughnut
+    const catCounts = cats.map(c => this.filtered.filter(r => r.category === c).length);
+    this.upsertDoughnut("chart-category", cats, catCounts, cats.map(c => CAT_COLORS[c]));
+
+    // Daily volume inbox vs spam
+    const dates = this.windowDates;
+    const inboxByDay = dates.map(d => this.filtered.filter(r => r.date === d && r.folder !== "Spam").length);
+    const spamByDay = dates.map(d => this.filtered.filter(r => r.date === d && r.folder === "Spam").length);
+    this.upsertLineBar("chart-volume", dates, [
+      { label: "Inbox", data: inboxByDay, color: "#3f7ae0" },
+      { label: "Spam", data: spamByDay, color: "#d9534f" }
+    ]);
+
+    // Spam rate trend
+    const spamRateByDay = dates.map(d => {
+      const dayRows = this.filtered.filter(r => r.date === d);
+      const daySpam = dayRows.filter(r => r.folder === "Spam").length;
+      return dayRows.length ? (daySpam / dayRows.length) * 100 : 0;
+    });
+    this.upsertSpamTrend("chart-spamtrend", dates, spamRateByDay);
+
+    // Spam rate by account
+    const perAccount = this.activeAccounts.map(a => {
+      const rows = this.filtered.filter(r => r.account_email === a);
+      const spamCt = rows.filter(r => r.folder === "Spam").length;
+      const rate = rows.length ? spamCt / rows.length : 0;
+      return { account: a, rate, total: rows.length };
+    }).filter(a => a.total > 0).sort((a, b) => b.rate - a.rate).slice(0, 15);
+    this.upsertWorstAccounts("chart-worstaccounts", perAccount);
+  }
+
+  upsertStackedBar(id, labels, datasets) {
+    const ctx = document.getElementById(id).getContext("2d");
+    if (this.charts[id]) this.charts[id].destroy();
+    this.charts[id] = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: datasets.map(ds => ({
+          label: ds.label, data: ds.data, backgroundColor: ds.color + "CC",
+          borderColor: ds.color, borderWidth: 1, borderRadius: 3, stack: "vol"
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "top", labels: { usePointStyle: true, boxWidth: 8 } } },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } } },
+          y: { stacked: true, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  upsertDoughnut(id, labels, data, colors) {
+    const ctx = document.getElementById(id).getContext("2d");
+    if (this.charts[id]) this.charts[id].destroy();
+    this.charts[id] = new Chart(ctx, {
+      type: "doughnut",
+      data: { labels, datasets: [{ data, backgroundColor: colors.map(c => c + "CC"), borderColor: "#fff", borderWidth: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: "60%",
+        plugins: {
+          legend: { position: "right", labels: { usePointStyle: true, padding: 12 } },
+          tooltip: {
+            callbacks: {
+              label: (c) => {
+                const total = c.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = total ? ((c.parsed / total) * 100).toFixed(1) : "0";
+                return `${c.label}: ${c.parsed} (${pct}%)`;
+              }
+            }
+          },
+          datalabels: {
+            display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+            color: "#fff",
+            font: { weight: "bold", size: 11 },
+            formatter: (value, ctx) => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              if (!total) return "";
+              return ((value / total) * 100).toFixed(1) + "%";
+            }
+          }
+        }
+      }
+    });
+  }
+
+  upsertLineBar(id, labels, datasets) {
+    const ctx = document.getElementById(id).getContext("2d");
+    if (this.charts[id]) this.charts[id].destroy();
+    this.charts[id] = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: datasets.map(ds => ({
+          label: ds.label, data: ds.data, backgroundColor: ds.color + "CC",
+          borderColor: ds.color, borderWidth: 1, borderRadius: 3, stack: "vol"
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "top", labels: { usePointStyle: true } } },
+        scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true } }
+      }
+    });
+  }
+
+  upsertSpamTrend(id, labels, data) {
+    const ctx = document.getElementById(id).getContext("2d");
+    if (this.charts[id]) this.charts[id].destroy();
+    this.charts[id] = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets: [{ label: "Spam rate %", data, borderColor: "#d9534f", backgroundColor: "#d9534f20", borderWidth: 2, fill: true, tension: 0.3, pointRadius: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (v) => v + "%" } } }
+      }
+    });
+  }
+
+  upsertWorstAccounts(id, rows) {
+    const ctx = document.getElementById(id).getContext("2d");
+    if (this.charts[id]) this.charts[id].destroy();
+    this.charts[id] = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: rows.map(r => r.account),
+        datasets: [{ data: rows.map(r => (r.rate * 100).toFixed(1)), backgroundColor: "#d9534fCC", borderRadius: 3 }]
+      },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => c.parsed.x + "% spam rate" } } },
+        scales: { x: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + "%" } } }
+      }
+    });
+  }
+
+  renderAccountTable() {
+    const rows = this.activeAccounts.map(a => {
+      const acctRows = this.filtered.filter(r => r.account_email === a);
+      const total = acctRows.length;
+      const spamCt = acctRows.filter(r => r.folder === "Spam").length;
+      const primaryCt = acctRows.filter(r => r.category === "Primary").length;
+      const spamRate = total ? spamCt / total : 0;
+      const primaryRate = total ? primaryCt / total : 0;
+
+      const acctAllTime = this.allLog.filter(r => r.account_email === a);
+      const lastDate = acctAllTime.length ? acctAllTime.map(r => r.date).sort().slice(-1)[0] : null;
+      const daysSince = lastDate ? Math.round((new Date(this.today) - new Date(lastDate)) / 86400000) : 999;
+
+      let status = "No Data", statusClass = "status-watch";
+      if (total === 0) { status = "No Data in Window"; statusClass = "status-watch"; }
+      else if (spamRate >= 0.5) { status = "At Risk: High Spam"; statusClass = "status-risk"; }
+      else if (spamRate >= 0.2) { status = "Watch"; statusClass = "status-watch"; }
+      else { status = "Healthy"; statusClass = "status-healthy"; }
+
+      return { account: a, status, statusClass, total, spamRate, primaryRate, daysSince, lastDate };
+    });
+    this.acctRows = rows;
+    this.renderAccountRows(rows);
+  }
+
+  renderAccountRows(rows) {
+    const sorted = [...rows].sort((a, b) => {
+      const av = a[this.sortField], bv = b[this.sortField];
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return this.sortDir === "asc" ? cmp : -cmp;
+    });
+    let html = '<table class="data-table"><thead><tr>';
+    const cols = [
+      ["account", "Account"], ["status", "Status"], ["total", "Emails"],
+      ["spamRate", "Spam Rate"], ["primaryRate", "Primary Rate"], ["daysSince", "Days Since Last Email"]
+    ];
+    cols.forEach(([field, label]) => {
+      html += `<th onclick="dashboard.sortAccountTable('${field}')">${label}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    sorted.forEach(r => {
+      html += `<tr>
+        <td>${r.account}</td>
+        <td><span class="status-pill ${r.statusClass}">${r.status}</span></td>
+        <td>${r.total}</td>
+        <td>${fmtPct(r.spamRate)}</td>
+        <td>${fmtPct(r.primaryRate)}</td>
+        <td>${r.daysSince === 999 ? "\u2014" : r.daysSince}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById("account-table").innerHTML = html;
+  }
+
+  sortAccountTable(field) {
+    if (this.sortField === field) {
+      this.sortDir = this.sortDir === "asc" ? "desc" : "asc";
+    } else {
+      this.sortField = field;
+      this.sortDir = "desc";
+    }
+    this.renderAccountRows(this.acctRows);
+  }
+
+  renderChannelTable() {
+    const rows = this.activeSenders.map(s => {
+      const rows = this.filtered.filter(r => r.from === s);
+      const total = rows.length;
+      const primary = rows.filter(r => r.category === "Primary").length;
+      const updates = rows.filter(r => r.category === "Updates").length;
+      const promotions = rows.filter(r => r.category === "Promotions").length;
+      const spam = rows.filter(r => r.folder === "Spam").length;
+      return { sender: s, total, primary, updates, promotions, spam,
+        primaryRate: total ? primary / total : 0, spamRate: total ? spam / total : 0 };
+    });
+    let html = '<table class="data-table"><thead><tr>' +
+      '<th>Sender / Channel</th><th>Total</th><th>Primary</th><th>Updates</th><th>Promotions</th><th>Spam</th><th>Primary Rate</th><th>Spam Rate</th>' +
+      '</tr></thead><tbody>';
+    rows.forEach(r => {
+      html += `<tr>
+        <td>${r.sender}</td>
+        <td>${r.total}</td>
+        <td>${r.primary}</td>
+        <td>${r.updates}</td>
+        <td>${r.promotions}</td>
+        <td>${r.spam}</td>
+        <td>${fmtPct(r.primaryRate)}</td>
+        <td>${fmtPct(r.spamRate)}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById("channel-table").innerHTML = html;
+  }
+}
+
+const dashboard = new Dashboard(SOURCE);
+</script>
+</body>
+</html>
